@@ -27,3 +27,8 @@ pub struct LogRecordPos {
     //文件id
     pub(crate) offset: u64, //文件偏移
 }
+
+pub struct ReadLogRecord {
+    pub(crate) record: LogRecord,
+    pub(crate) size: u64,
+}

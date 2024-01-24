@@ -1,4 +1,4 @@
-use crate::data::log_record::LogRecord;
+use crate::data::log_record::{LogRecord, ReadLogRecord};
 use crate::errors::{Errors, Result};
 use crate::fio::IOManager;
 use parking_lot::RwLock;
@@ -22,6 +22,10 @@ impl DataFile {
     pub fn write(&self, buf: &[u8]) -> Result<usize> {
         todo!()
     }
+    pub fn set_write_off(&self, offset: u64) {
+        let mut write_guard = self.write_off.write();
+        *write_guard = offset;
+    }
     pub fn get_write_off(&self) -> u64 {
         let read_guard = self.write_off.read();
         *read_guard
@@ -33,7 +37,7 @@ impl DataFile {
     pub fn sync(&self) -> Result<()> {
         todo!()
     }
-    pub fn read_log_record(&self, offset: u64) -> Result<LogRecord> {
+    pub fn read_log_record(&self, offset: u64) -> Result<ReadLogRecord> {
         todo!()
     }
 }
