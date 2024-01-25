@@ -1,9 +1,15 @@
-use crate::data::log_record::{LogRecord, ReadLogRecord};
-use crate::errors::{Errors, Result};
-use crate::fio::IOManager;
-use parking_lot::RwLock;
 use std::path::PathBuf;
 use std::sync::Arc;
+
+use bytes::{Buf, BytesMut};
+use parking_lot::RwLock;
+use prost::{decode_length_delimiter, length_delimiter_len};
+
+use crate::data::log_record::{
+    max_log_record_header_size, LogRecord, LogRecordType, ReadLogRecord,
+};
+use crate::errors::{Errors, Result};
+use crate::fio::{new_io_manager, IOManager};
 
 pub const DATA_FILE_NAME_SUFFIX: &str = ".data";
 
@@ -17,10 +23,23 @@ pub struct DataFile {
 
 impl DataFile {
     pub fn new(dir_path: PathBuf, file_id: u32) -> Result<DataFile> {
-        todo!()
+        //根据path和id构造出完整的文件名称
+        let file_name = get_data_file_name(&dir_path, file_id);
+        //初始化io_manager
+        let io_manager = new_io_manager(file_name)?;
+        Ok({
+            DataFile {
+                file_id: Arc::new(RwLock::new(file_id)),
+                write_off: Arc::new(RwLock::new(0)),
+                io_manager,
+            }
+        })
     }
     pub fn write(&self, buf: &[u8]) -> Result<usize> {
-        todo!()
+        let n_bytes = self.io_manager.write(buf)?;
+        let mut wg = self.write_off.write();
+        *wg += n_bytes as u64;
+        Ok(n_bytes)
     }
     pub fn set_write_off(&self, offset: u64) {
         let mut write_guard = self.write_off.write();
@@ -35,9 +54,103 @@ impl DataFile {
         *read_guard
     }
     pub fn sync(&self) -> Result<()> {
-        todo!()
+        self.io_manager.sync()
     }
     pub fn read_log_record(&self, offset: u64) -> Result<ReadLogRecord> {
-        todo!()
+        //先读取出header部分的数据
+        let mut header_buf = BytesMut::zeroed(max_log_record_header_size());
+        self.io_manager.read(&mut header_buf, offset)?;
+        //取出type,把crc放在了最后一个字节,type在第一个字节
+        let rec_type = header_buf.get_u8();
+        //取出key和value的长度
+        let key_size = decode_length_delimiter(&mut header_buf).unwrap();
+        let value_size = decode_length_delimiter(&mut header_buf).unwrap();
+        //如果key和value的长度都为0,则说明读取到了文件的末尾,直接返回
+        if key_size == 0 && value_size == 0 {
+            return Err(Errors::ReadDataFileEOF);
+        }
+
+        //根据key和value的size读取实际的key和value
+
+        //获取实际的header大小,type 1字节,加上key和value的size编码后的长度
+        let actual_header_size =
+            length_delimiter_len(key_size) + length_delimiter_len(value_size) + 1;
+        let mut kv_buf = BytesMut::zeroed(key_size + value_size + 4); //最后4字节为CRC校验值
+        self.io_manager
+            .read(&mut kv_buf, offset + actual_header_size as u64)?;
+        //构造LogRecord
+        let mut log_record = LogRecord {
+            key: kv_buf.get(..key_size).unwrap().to_vec(),
+            value: kv_buf.get(key_size..kv_buf.len() - 4).unwrap().to_vec(),
+            rec_type: LogRecordType::from_u8(rec_type),
+        };
+        //得到CRC的值
+        kv_buf.advance(key_size + value_size);
+        if kv_buf.get_u32() != log_record.get_crc() {
+            return Err(Errors::InvalidLogRecordCrc);
+        }
+        Ok(ReadLogRecord {
+            record: log_record,
+            size: (actual_header_size + key_size + value_size + 4) as u64,
+        })
+    }
+}
+
+fn get_data_file_name(dir_path: &PathBuf, file_id: u32) -> PathBuf {
+    let name = std::format!("{:09}{}", file_id, DATA_FILE_NAME_SUFFIX);
+    dir_path.to_path_buf().join(name)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_new_data_file() {
+        let dir_path = std::env::temp_dir();
+        let data_file = DataFile::new(dir_path.clone(), 0);
+        assert!(data_file.is_ok());
+        let data_file = data_file.unwrap();
+        assert_eq!(data_file.get_file_id(), 0);
+        println!("temp dir:{}", dir_path.clone().display());
+
+        let data_file = DataFile::new(dir_path.clone(), 0);
+        assert!(data_file.is_ok());
+        let data_file = data_file.unwrap();
+        assert_eq!(data_file.get_file_id(), 0);
+
+        let data_file = DataFile::new(dir_path.clone(), 3);
+        assert!(data_file.is_ok());
+        let data_file = data_file.unwrap();
+        assert_eq!(data_file.get_file_id(), 3);
+    }
+
+    #[test]
+    fn test_data_file_write() {
+        let dir_path = std::env::temp_dir();
+        let data_file_res = DataFile::new(dir_path.clone(), 100);
+        assert!(data_file_res.is_ok());
+        let data_file = data_file_res.unwrap();
+        assert_eq!(data_file.get_file_id(), 100);
+
+        let write_res = data_file.write("aaa".as_bytes());
+        assert!(write_res.is_ok());
+        let write_res = write_res.unwrap();
+        assert_eq!(write_res, 3);
+        let write_res = data_file.write("aaaa".as_bytes());
+        assert!(write_res.is_ok());
+        let write_res = write_res.unwrap();
+        assert_eq!(write_res, 4);
+    }
+    #[test]
+    fn test_data_file_sync() {
+        let dir_path = std::env::temp_dir();
+        let data_file_res = DataFile::new(dir_path.clone(), 200);
+        assert!(data_file_res.is_ok());
+        let data_file = data_file_res.unwrap();
+        assert_eq!(data_file.get_file_id(), 200);
+
+        let sync_res = data_file.sync();
+        assert!(sync_res.is_ok());
     }
 }

@@ -1,17 +1,20 @@
-use crate::errors::{Errors, Result};
-use crate::fio::IOManager;
-use log::error;
-use parking_lot::RwLock;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::os::unix::prelude::FileExt;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use log::error;
+use parking_lot::RwLock;
+
+use crate::errors::{Errors, Result};
+use crate::fio::IOManager;
+
 pub struct FileIO {
     fd: Arc<RwLock<File>>,
 }
 
+//数据文件(DataFile)调用实现了IOManager的结构体的相关方法进行IO
 impl FileIO {
     //文件名称的路径
     pub fn new(file_name: PathBuf) -> Result<Self> {
@@ -71,8 +74,9 @@ impl IOManager for FileIO {
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use std::fs;
+
+    use super::*;
 
     #[test]
     fn test_file_to_write() {
