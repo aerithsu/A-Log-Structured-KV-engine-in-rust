@@ -1,5 +1,5 @@
 use log::error;
-use std::{io, result};
+use std::result;
 use thiserror::Error;
 
 pub type Result<T> = result::Result<T, Errors>;
