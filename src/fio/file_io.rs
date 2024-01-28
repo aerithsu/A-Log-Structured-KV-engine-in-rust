@@ -37,6 +37,7 @@ impl FileIO {
 }
 
 impl IOManager for FileIO {
+    //buf的长度为期望读取到的最大字节数
     fn read(&self, buf: &mut [u8], offset: u64) -> Result<usize> {
         let read_guard = self.fd.read();
         let n_bytes = match read_guard.read_at(buf, offset) {

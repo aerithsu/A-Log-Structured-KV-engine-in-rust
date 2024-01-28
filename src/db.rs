@@ -9,7 +9,6 @@ use parking_lot::RwLock;
 
 use crate::data::data_file::{DataFile, DATA_FILE_NAME_SUFFIX};
 use crate::data::log_record::{LogRecord, LogRecordPos, LogRecordType, ReadLogRecord};
-use crate::errors::Errors::KeyIsEmpty;
 use crate::errors::{Errors, Result};
 use crate::index::{new_indexer, Indexer};
 use crate::options::Options;
@@ -39,13 +38,13 @@ impl Engine {
         //判断数据目录是否存在,如果不存在则创建这个目录
         if !dir_path.is_dir() {
             //目录不存在且创建目录失败
-            if let Err(e) = fs::create_dir(&dir_path) {
+            if let Err(e) = fs::create_dir(dir_path) {
                 warn!("create database directory err:{}", e);
                 return Err(Errors::FailedToCreateDatabaseDir);
             }
         }
         //加载数据文件
-        let mut data_files = load_data_files(&dir_path)?;
+        let mut data_files = load_data_files(dir_path)?;
         //设置file_id信息
         let mut file_ids = vec![];
         for data_file in &data_files {
@@ -61,7 +60,7 @@ impl Engine {
         }
         let active_file = match data_files.pop() {
             Some(file) => file,
-            None => DataFile::new(&dir_path, INITIAL_FILE_ID)?, //这代表数据库目录里面没有一个文件
+            None => DataFile::new(dir_path, INITIAL_FILE_ID)?, //这代表数据库目录里面没有一个文件
         };
         //构造存储引擎实例
         let engine = Engine {
@@ -159,7 +158,7 @@ impl Engine {
     }
     pub fn delete(&self, key: Bytes) -> Result<()> {
         if key.is_empty() {
-            return Err(KeyIsEmpty);
+            return Err(Errors::KeyIsEmpty);
         }
         //从索引中取出相应的数据,如果不存在则直接返回
         let pos = self.indexer.get(key.to_vec());
@@ -236,43 +235,42 @@ impl Engine {
     }
 }
 
+//先把所有数据文件的id加载入一个Vec，反向排序，再根据这个Vec加载数据文件
 fn load_data_files(dir_path: &PathBuf) -> Result<Vec<DataFile>> {
-    let dir = fs::read_dir(dir_path.clone());
+    let dir = fs::read_dir(dir_path);
     if dir.is_err() {
         return Err(Errors::FailedToReadDataBaseDir);
     }
     let mut file_ids = vec![];
     let mut data_files = vec![];
     for file in dir.unwrap() {
-        if let Ok(entry) = file {
-            //拿到文件名
-            let file_os_str = entry.file_name();
-            let file_name = file_os_str.to_str().unwrap();
-            //判断文件是不是我们对应的数据文件(以.data为后缀)
-            if file_name.ends_with(DATA_FILE_NAME_SUFFIX) {
-                //文件名的格式为数字+.data
-                let spilt_names: Vec<&str> = file_name.split(".").collect();
-                let file_id = match spilt_names[0].parse::<u32>() {
-                    Ok(fid) => fid,
-                    Err(_) => return Err(Errors::DataDirectoryCorrupted),
-                };
-                file_ids.push(file_id);
-            }
+        //拿到文件名
+        let entry = file.unwrap();
+        let file_os_str = entry.file_name();
+        let file_name = file_os_str.to_str().unwrap();
+        //判断文件是不是我们对应的数据文件(以.data为后缀)
+        if file_name.ends_with(DATA_FILE_NAME_SUFFIX) {
+            //文件名的格式为数字+.data
+            let spilt_names: Vec<&str> = file_name.split('.').collect();
+            let file_id = match spilt_names[0].parse::<u32>() {
+                Ok(fid) => fid,
+                Err(_) => return Err(Errors::DataDirectoryCorrupted),
+            };
+            file_ids.push(file_id);
         }
     }
-    //如果没有数据文件则直接返回
     //对文件id进行排序
     file_ids.sort_by(|a, b| b.cmp(a));
     //遍历所有的文件id,一次打开对应的数据文件(因为这是日志型数据库)
     for file_id in file_ids {
-        data_files.push(DataFile::new(&dir_path, file_id)?);
+        data_files.push(DataFile::new(dir_path, file_id)?);
     }
     Ok(data_files)
 }
 
 fn check_options(opts: &Options) -> Option<Errors> {
     let dir_path = opts.dir_path.to_str();
-    if dir_path.is_none() || dir_path.unwrap().len() == 0 {
+    if dir_path.is_none() || dir_path.unwrap().is_empty() {
         return Some(Errors::DirPathIsEmpty);
     }
     if opts.data_file_size == 0 {

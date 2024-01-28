@@ -19,6 +19,7 @@ impl LogRecordType {
         }
     }
 }
+
 #[derive(Debug)]
 pub struct LogRecord {
     pub(crate) key: Vec<u8>,
@@ -89,6 +90,7 @@ pub struct ReadLogRecord {
 //获取log_record header部分的最大长度
 #[inline]
 pub fn max_log_record_header_size() -> usize {
+    //length_delimiter对于不同大小usize值编码后的长度不同
     std::mem::size_of::<u8>() + length_delimiter_len(u32::MAX as usize) * 2
 }
 

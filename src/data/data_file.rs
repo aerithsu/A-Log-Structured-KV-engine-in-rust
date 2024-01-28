@@ -63,7 +63,7 @@ impl DataFile {
         //取出type,把crc放在了最后一个字节,type在第一个字节
         let rec_type = header_buf.get_u8();
         //取出key和value的长度
-        let key_size = decode_length_delimiter(&mut header_buf).unwrap();
+        let key_size = decode_length_delimiter(&mut header_buf).unwrap(); //应该是里面维护了一个cursor
         let value_size = decode_length_delimiter(&mut header_buf).unwrap();
         //如果key和value的长度都为0,则说明读取到了文件的末尾,直接返回
         if key_size == 0 && value_size == 0 {
