@@ -152,7 +152,7 @@ impl Engine {
             file.unwrap().read_log_record(pos.offset)?.record
         };
         //判断LogRecord的类型
-        if log_record.rec_type == LogRecordType::DELETE {
+        if log_record.rec_type == LogRecordType::DELETED {
             return Err(Errors::KeyNotFound);
         }
         Ok(log_record.value.into()) //Bytes结构体有实现From<Vec<u8>>的trait
@@ -169,7 +169,7 @@ impl Engine {
         let mut record = LogRecord {
             key: key.to_vec(),
             value: Default::default(),
-            rec_type: LogRecordType::DELETE,
+            rec_type: LogRecordType::DELETED,
         };
         self.append_log_record(&mut record)?;
         //从内存索引中删除key
@@ -219,7 +219,7 @@ impl Engine {
                     LogRecordType::NORMAL => {
                         self.indexer.put(log_record.key.to_vec(), log_record_pos)
                     }
-                    LogRecordType::DELETE => self.indexer.delete(log_record.key.to_vec()),
+                    LogRecordType::DELETED => self.indexer.delete(log_record.key.to_vec()),
                 };
                 if !ok {
                     return Err(Errors::IndexUpdateFailed);

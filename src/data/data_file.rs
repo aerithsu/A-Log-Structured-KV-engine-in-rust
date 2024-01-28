@@ -153,4 +153,60 @@ mod test {
         let sync_res = data_file.sync();
         assert!(sync_res.is_ok());
     }
+    #[test]
+    fn test_data_file_read_log_record() {
+        let dir_path = std::env::temp_dir();
+        let data_file_res1 = DataFile::new(dir_path.clone(), 700);
+        assert!(data_file_res1.is_ok());
+        let data_file1 = data_file_res1.unwrap();
+        assert_eq!(data_file1.get_file_id(), 700);
+
+        let enc1 = LogRecord {
+            key: "name".as_bytes().to_vec(),
+            value: "bitcask-rs-kv".as_bytes().to_vec(),
+            rec_type: LogRecordType::NORMAL,
+        };
+        let write_res1 = data_file1.write(&enc1.encode());
+        assert!(write_res1.is_ok());
+
+        // 从起始位置读取
+        let read_res1 = data_file1.read_log_record(0);
+        assert!(read_res1.is_ok());
+        let read_enc1 = read_res1.ok().unwrap().record;
+        assert_eq!(enc1.key, read_enc1.key);
+        assert_eq!(enc1.value, read_enc1.value);
+        assert_eq!(enc1.rec_type, read_enc1.rec_type);
+
+        // 从新的位置开启读取
+        let enc2 = LogRecord {
+            key: "name".as_bytes().to_vec(),
+            value: "new-value".as_bytes().to_vec(),
+            rec_type: LogRecordType::NORMAL,
+        };
+        let write_res2 = data_file1.write(&enc2.encode());
+        assert!(write_res2.is_ok());
+
+        let read_res2 = data_file1.read_log_record(24);
+        assert!(read_res2.is_ok());
+        let read_enc2 = read_res2.ok().unwrap().record;
+        assert_eq!(enc2.key, read_enc2.key);
+        assert_eq!(enc2.value, read_enc2.value);
+        assert_eq!(enc2.rec_type, read_enc2.rec_type);
+
+        // 类型是 Deleted
+        let enc3 = LogRecord {
+            key: "name".as_bytes().to_vec(),
+            value: Default::default(),
+            rec_type: LogRecordType::DELETED,
+        };
+        let write_res3 = data_file1.write(&enc3.encode());
+        assert!(write_res3.is_ok());
+
+        let read_res3 = data_file1.read_log_record(44);
+        assert!(read_res3.is_ok());
+        let read_enc3 = read_res3.ok().unwrap().record;
+        assert_eq!(enc3.key, read_enc3.key);
+        assert_eq!(enc3.value, read_enc3.value);
+        assert_eq!(enc3.rec_type, read_enc3.rec_type);
+    }
 }
