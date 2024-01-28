@@ -97,7 +97,7 @@ mod test {
 		let path = PathBuf::from("/tmp/a.data1");
 		let fio_res = FileIO::new(&path);
 		assert!(fio_res.is_ok());
-		let fio = fio_res.ok().unwrap();
+		let fio = fio_res.unwrap();
 
 		let res1 = fio.write("key-a\n".as_bytes());
 		assert!(res1.is_ok());
