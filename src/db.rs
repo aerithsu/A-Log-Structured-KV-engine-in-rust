@@ -61,7 +61,7 @@ impl Engine {
         }
         let active_file = match data_files.pop() {
             Some(file) => file,
-            None => DataFile::new(dir_path.clone(), INITIAL_FILE_ID)?, //这代表数据库目录里面没有一个文件
+            None => DataFile::new(&dir_path, INITIAL_FILE_ID)?, //这代表数据库目录里面没有一个文件
         };
         //构造存储引擎实例
         let engine = Engine {
@@ -110,10 +110,10 @@ impl Engine {
             let current_fid = active_file.get_file_id();
             //将旧的数据文件放入map中
             let mut older_files = self.older_files.write();
-            let old_file = DataFile::new(dir_path.clone(), current_fid)?;
+            let old_file = DataFile::new(&dir_path, current_fid)?;
             older_files.insert(current_fid, old_file);
             //打开新的数据文件
-            let new_file = DataFile::new(dir_path.clone(), current_fid + 1)?;
+            let new_file = DataFile::new(&dir_path, current_fid + 1)?;
             *active_file = new_file;
         }
         let write_off = active_file.get_write_off();
@@ -265,7 +265,7 @@ fn load_data_files(dir_path: &PathBuf) -> Result<Vec<DataFile>> {
     file_ids.sort_by(|a, b| b.cmp(a));
     //遍历所有的文件id,一次打开对应的数据文件(因为这是日志型数据库)
     for file_id in file_ids {
-        data_files.push(DataFile::new(dir_path.clone(), file_id)?);
+        data_files.push(DataFile::new(&dir_path, file_id)?);
     }
     Ok(data_files)
 }
