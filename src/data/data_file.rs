@@ -104,6 +104,7 @@ fn get_data_file_name(dir_path: &Path, file_id: u32) -> PathBuf {
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::fs;
 
     #[test]
     fn test_new_data_file() {
@@ -112,7 +113,7 @@ mod test {
         assert!(data_file.is_ok());
         let data_file = data_file.unwrap();
         assert_eq!(data_file.get_file_id(), 0);
-        println!("temp dir:{}", dir_path.clone().display());
+        println!("temp dir:{}", dir_path.display());
 
         let data_file = DataFile::new(&dir_path, 0);
         assert!(data_file.is_ok());
@@ -123,6 +124,8 @@ mod test {
         assert!(data_file.is_ok());
         let data_file = data_file.unwrap();
         assert_eq!(data_file.get_file_id(), 3);
+        fs::remove_file(get_data_file_name(&dir_path, 0)).unwrap();
+        fs::remove_file(get_data_file_name(&dir_path, 3)).unwrap();
     }
 
     #[test]
@@ -141,6 +144,8 @@ mod test {
         assert!(write_res.is_ok());
         let write_res = write_res.unwrap();
         assert_eq!(write_res, 4);
+        assert_eq!(data_file.get_write_off(), 7);
+        fs::remove_file(get_data_file_name(&dir_path, 100)).unwrap();
     }
 
     #[test]
@@ -153,6 +158,7 @@ mod test {
 
         let sync_res = data_file.sync();
         assert!(sync_res.is_ok());
+        fs::remove_file(get_data_file_name(&dir_path, 200)).unwrap();
     }
 
     #[test]
@@ -174,12 +180,12 @@ mod test {
         // 从起始位置读取
         let read_res1 = data_file1.read_log_record(0);
         assert!(read_res1.is_ok());
-        let read_enc1 = read_res1.ok().unwrap().record;
-        assert_eq!(enc1.key, read_enc1.key);
-        assert_eq!(enc1.value, read_enc1.value);
-        assert_eq!(enc1.rec_type, read_enc1.rec_type);
-
-        // 从新的位置开启读取
+        let ReadLogRecord { record, size } = read_res1.unwrap();
+        assert_eq!(enc1.key, record.key);
+        assert_eq!(enc1.value, record.value);
+        assert_eq!(enc1.rec_type, record.rec_type);
+        assert_eq!(write_res1.unwrap() as u64, size); //这里保证了逻辑正确即写入datafile中的一条record的size与读出来的相同
+                                                      // 从新的位置开启读取
         let enc2 = LogRecord {
             key: "name".as_bytes().to_vec(),
             value: "new-value".as_bytes().to_vec(),
@@ -188,7 +194,7 @@ mod test {
         let write_res2 = data_file1.write(&enc2.encode());
         assert!(write_res2.is_ok());
 
-        let read_res2 = data_file1.read_log_record(24);
+        let read_res2 = data_file1.read_log_record(size);
         assert!(read_res2.is_ok());
         let read_enc2 = read_res2.ok().unwrap().record;
         assert_eq!(enc2.key, read_enc2.key);
@@ -203,12 +209,12 @@ mod test {
         };
         let write_res3 = data_file1.write(&enc3.encode());
         assert!(write_res3.is_ok());
-
-        let read_res3 = data_file1.read_log_record(44);
+        let read_res3 = data_file1.read_log_record(size + write_res2.unwrap() as u64);
         assert!(read_res3.is_ok());
         let read_enc3 = read_res3.ok().unwrap().record;
         assert_eq!(enc3.key, read_enc3.key);
         assert_eq!(enc3.value, read_enc3.value);
         assert_eq!(enc3.rec_type, read_enc3.rec_type);
+        fs::remove_file(get_data_file_name(&dir_path, 700)).unwrap();
     }
 }

@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use std::path::PathBuf;
 
 //数据库启动时用户所进行的配置
@@ -16,4 +17,15 @@ pub struct Options {
 pub enum IndexType {
     BTree,
     SkipList,
+}
+//默认的选项
+impl Default for Options {
+    fn default() -> Self {
+        Options {
+            dir_path: std::env::temp_dir().join("bitcask"),
+            data_file_size: 256 * 1024 * 1024, //256mb
+            sync_writes: false,
+            index_type: IndexType::BTree,
+        }
+    }
 }
