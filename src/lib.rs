@@ -4,6 +4,8 @@ pub mod errors;
 mod fio;
 pub mod index;
 pub mod options;
-mod util;
+pub mod util;
+
 #[cfg(test)]
 mod db_test;
+pub mod iterator;

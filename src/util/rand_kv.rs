@@ -8,7 +8,10 @@ pub fn get_test_key(i: i32) -> Bytes {
 //get_test_value 方法增加一点长度，不然测不到文件写满转换的 case
 #[allow(dead_code)]
 pub fn get_test_value(i: i32) -> Bytes {
-    Bytes::from(format!("bitcask-rs-value-value-value-value-value-value-value-value-value-{:09}", i))
+    Bytes::from(format!(
+        "bitcask-rs-value-value-value-value-value-value-value-value-value-{:09}",
+        i
+    ))
 }
 
 #[test]

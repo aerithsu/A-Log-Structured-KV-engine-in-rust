@@ -1,9 +1,9 @@
-use std::path::PathBuf;
-use bytes::Bytes;
 use crate::db::Engine;
 use crate::errors::Errors;
 use crate::options::{IndexType, Options};
 use crate::util::rand_kv::{get_test_key, get_test_value};
+use bytes::Bytes;
+use std::path::PathBuf;
 
 #[test]
 fn test_engine_put_and_get() {
@@ -62,5 +62,4 @@ fn test_engine_delete() {
         index_type: IndexType::BTree,
     };
     let engine = Engine::open(opts.clone());
-
 }
