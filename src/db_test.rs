@@ -4,12 +4,11 @@ use crate::options::{IndexType, Options};
 use crate::util::rand_kv::{get_test_key, get_test_value};
 use bytes::Bytes;
 use std::path::PathBuf;
-
 #[test]
 fn test_engine_put_and_get() {
     let opts = Options {
         dir_path: PathBuf::from("/tmp/bitcask-rs-put"),
-        data_file_size: 64 * 1024 * 2014,
+        data_file_size: 64 * 1024 * 1024,
         sync_writes: false,
         index_type: IndexType::BTree,
     };
@@ -42,7 +41,7 @@ fn test_engine_put_and_get() {
     assert!(res.is_ok());
     assert!(engine.get(get_test_key(32)).unwrap().is_empty());
 
-    //5.写到数据文件进行了转换
+    //5.写到数据文件进行了转换,插入了100万个数据
     for i in 0..1000000 {
         let res = engine.put(get_test_key(i), get_test_value(i));
         assert!(res.is_ok());
